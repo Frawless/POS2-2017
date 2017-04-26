@@ -1,5 +1,5 @@
 #################################################
-#	Projekt: Projekt do pøedmìtu POS			#
+#	Projekt: Projekt do pï¿½edmï¿½tu POS			#
 #		 Ticket Algorithm						#
 #	 Autor: Bc. Jakub Stejskal <xstejs24>		#
 # Nazev souboru: GNUakefile						#	
@@ -10,8 +10,8 @@
 CC = gcc 
 CFLAGS = -std=gnu99 -Wall -pedantic -W -Wextra -pthread -D_SVID_SOURCE -D_GNU_SOURCE -D_BSD_SOURCE
 LOGIN = xstejs24
-PROJ_NAME = proj01
-FILES = proj01.o 
+PROJ_NAME = proj02
+FILES = proj02.o 
 PACK = *.c *.h Makefile
 
 default: proj01.o
