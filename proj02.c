@@ -55,11 +55,12 @@ char *outputFile;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;	// Mutex create
 pthread_cond_t  cond = PTHREAD_COND_INITIALIZER;	// cond create
 
-// Note: This function returns a pointer to a substring of the original string.
-// If the given string was allocated dynamically, the caller must not overwrite
-// that pointer with the returned value, since the original pointer must be
-// deallocated using the same allocator with which it was allocated.  The return
-// value must NOT be deallocated using free() etc.
+/**
+ * Function for trim spare white characters in input.
+ * @param str - input line
+ * @return - parsed input
+ */
+// This function is taken from stackoverflow
 // Source: http://stackoverflow.com/questions/122616/how-do-i-trim-leading-trailing-whitespace-in-a-standard-way
 char *trimwhitespace(char *str)
 {
@@ -81,40 +82,54 @@ char *trimwhitespace(char *str)
 	return str;
 }
 
-
+/**
+ * Function for handle SIGINT signal
+ */
 void handler()
-{
+{	
+	pthread_mutex_lock(&mutex);
 	if(foreID > 0){
-		printf("Killing process [%d]\n",foreID);
+		printf("Killed process [%d]\n",foreID);
 		kill(foreID,SIGINT);
-		foreID = 0;
+//		foreID = 0;
 	}
+	pthread_mutex_unlock(&mutex);
 }
 
+/**
+ * Function for handle SIGCHLD signal
+ */
 void childHandler()
 {
 	int status;
-	pid_t child = waitpid(-1, &status, WNOHANG);
+	printf("BackID: %d\n",backID);
+	pid_t child = waitpid(backID, &status, WNOHANG);
 	
 	if(child < 0)
 		return;
-	
-	// http://pubs.opengroup.org/onlinepubs/9699919799/functions/wait.html
-	if(WIFEXITED(status))
-		printf("Proces [%d] terminated normally with exit code %d\n",child, WEXITSTATUS(status));
-	else if(WIFSIGNALED(status))
-		printf("Proces [%d] terminated with exit code %d\n",child, WTERMSIG(status));
-	else if(WIFSTOPPED(status))
-		printf("Proces [%d] was stopped with exit code %d\n",child, WIFSTOPPED(status));
-	else
-		printf("There is no proces [%d] running\n",child);
-	
+	else if(child == 0)
+		return;
+	else{
+		// http://pubs.opengroup.org/onlinepubs/9699919799/functions/wait.html
+		if(WIFEXITED(status))
+			printf("Process [%d] terminated normally with exit code %d\n",child, WEXITSTATUS(status));
+		else if(WIFSIGNALED(status))
+			printf("Process [%d] terminated with exit code %d\n",child, WTERMSIG(status));
+		else if(WIFSTOPPED(status))
+			printf("Process [%d] was stopped with exit code %d\n",child, WIFSTOPPED(status));
+		else
+			printf("There is no process [%d] running\n",child);
+	}
 	printf(PROMPT);
 	fflush(stdout);
 	
-	backID = 0;
+//	backID = 0;
 }
 
+/**
+ * Function for fill redirect information
+ * @param token - input/output file name
+ */
 void createRedirects(char *token)
 {
 	if(redInput && inputFile == '\0')
@@ -124,6 +139,9 @@ void createRedirects(char *token)
 		outputFile = token;
 }
 
+/**
+ * Function for reset global variables
+ */
 void cleanAfterExecute()
 {
 	inputFile = '\0';
@@ -133,7 +151,10 @@ void cleanAfterExecute()
 	redOutput = false;
 }
 
-
+/**
+ * Function for parse input buffer to array with program name and parameters.
+ * @param argv - output array with programe name and parameters
+ */
 void parseInputCmd(char **argv)
 {
 	char *token;
@@ -166,38 +187,51 @@ void parseInputCmd(char **argv)
 }
 
 // http://www.csl.mtu.edu/cs4411.ck/www/NOTES/process/fork/exec.html
+/**
+ * Function for create new process and run UNIX program
+ * @param argv - array with program name and parameters
+ */
 void run(char** argv)
 {
 	int output, input;
 	pid_t  pid;
 
-	if ((pid = fork()) < 0) {     /* fork a child process           */
+	if((pid = fork()) < 0){
 			fprintf(stderr,"ERROR: forking child process failed\n");
 			fflush(stderr);
 			exit(1);
 	}
-	else if (pid == 0) {          /* for the child process:         */
+	else if(pid == 0){
 		// Redirect >
-		if(outputFile != '\0')
-		{
+		if(outputFile != '\0'){
 			output = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+			if(output < 0)
+			{
+				fprintf(stderr,"ERROR: opening output file\n");
+				fflush(stderr);
+				exit(1);
+			}
 			close(STDOUT_FILENO);
 			dup(output);
 		}
 		// Redirect <
-		if(inputFile != '\0')
-		{
+		if(inputFile != '\0'){
 			input = open(inputFile, O_RDONLY);
+			if(input < 0)
+			{
+				fprintf(stderr,"ERROR: opening output file\n");
+				fflush(stderr);
+				exit(1);
+			}			
 			close(STDIN_FILENO);
 			dup(input);
 		}
 		// Background save pid
-		if(background)
-		{
+		if(background){
 			setpgid(pid,pid);
 		}
 		// Execute
-		if (execvp(*argv, argv) < 0) {
+		if(execvp(*argv, argv) < 0){
 			   printf("No such program with name \'%s\' in Unix system!\n",*argv);
 			   fflush(stdout);
 			   exit(1);
@@ -212,14 +246,12 @@ void run(char** argv)
 		
 	}
 	else {                              
-		if(!background)
-		{
+		if(!background){
 			foreID = pid;	// save PID of foreground process
-			int status;
-			while (wait(&status) != pid);
+//			int status;	
+			waitpid(pid,NULL,0);
 		}
-		else
-		{
+		else{
 			backID = pid;	// save PID of background process
 			printf("Started \'%s\': [%d]\n",argv[0],pid);
 			fflush(stdout);
@@ -228,7 +260,10 @@ void run(char** argv)
 	}	
 }
 
-
+/**
+ * Function for start executing of parsed command.
+ * Function of execution thread,
+ */
 void *executeCommand()
 {
 	char *argv[512];
@@ -258,8 +293,10 @@ void *executeCommand()
 }
 
 
-
-
+/**
+ * Function for simulate shell.
+ * Function of read thread.
+ */
 void *runShell()
 {
 	bool tooLongCommand = false;
@@ -331,7 +368,7 @@ int main(void) {
 	sig_child.sa_flags = 0;
 	sigemptyset(&sig_child.sa_mask);
 	sigaction(SIGCHLD,&sig_child,NULL);
-	// Ctrl+c handler for foreground process
+	// Ctrl+C handler for foreground process
 	sig_int.sa_handler = handler;
 	sig_int.sa_flags = 0;
 	sigemptyset(&sig_int.sa_mask);
@@ -352,7 +389,6 @@ int main(void) {
 	pthread_attr_destroy(&attr);
 	pthread_cond_destroy(&cond);
 	pthread_mutex_destroy(&mutex);
-	
 	
 	return (EXIT_SUCCESS);
 }

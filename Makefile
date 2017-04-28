@@ -8,17 +8,14 @@
 #################################################
 
 CC = gcc 
-CFLAGS = -std=gnu99 -Wall -pedantic -W -Wextra -pthread -D_SVID_SOURCE -D_GNU_SOURCE -D_BSD_SOURCE
+CFLAGS = -std=gnu99 -Wall -pedantic -Wextra -g3 -O -pthread
 LOGIN = xstejs24
 PROJ_NAME = proj02
-FILES = proj02.o 
+FILES = proj02.c
 PACK = *.c *.h Makefile
-
-%.o: %.c %.h
-	$(CC) $(CFLAGS) -c -o $@ $<
 	
 default: $(FILES)
-	$(CC) $(CFLAGS) -o $(PROJ_NAME) $^ -lrt
+	$(CC) $(CFLAGS) -o $(PROJ_NAME) $(FILES)
 	
 pack: clean
 	rm -f $(LOGIN).zip
