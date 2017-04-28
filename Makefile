@@ -1,14 +1,14 @@
 #################################################
-#	Projekt: Projekt do p�edm�tu POS			#
-#		 Ticket Algorithm						#
-#	 Autor: Bc. Jakub Stejskal <xstejs24>		#
-# Nazev souboru: GNUakefile						#	
-#	  Datum: 9. 2. 2017		    				#		
-#	  Verze: 1.0								#
+#	Projekt: Projekt do p�edm�tu POS	#
+#		 Ticket Algorithm		#
+#	 Autor: Bc. Jakub Stejskal <xstejs24>	#
+# Nazev souboru: GNUakefile			#	
+#	  Datum: 9. 2. 2017		    	#		
+#	  Verze: 1.0				#
 #################################################
 
 CC = gcc 
-CFLAGS = -std=gnu99 -Wall -pedantic -Wextra -g3 -O -pthread
+CFLAGS = -std=gnu99 -Wall -pedantic -Wextra -g -O -pthread
 LOGIN = xstejs24
 PROJ_NAME = proj02
 FILES = proj02.c

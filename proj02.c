@@ -88,9 +88,9 @@ char *trimwhitespace(char *str)
 void handler()
 {	
 	pthread_mutex_lock(&mutex);
-	if(foreID > 0){
-		printf("Killed process [%d]\n",foreID);
-		kill(foreID,SIGINT);
+	if(backID > 0){
+//		printf("Killed process [%d]\n",foreID);
+		kill(backID,SIGINT);
 //		foreID = 0;
 	}
 	pthread_mutex_unlock(&mutex);
@@ -102,8 +102,7 @@ void handler()
 void childHandler()
 {
 	int status;
-	printf("BackID: %d\n",backID);
-	pid_t child = waitpid(backID, &status, WNOHANG);
+	pid_t child = waitpid(-1, &status, WNOHANG);
 	
 	if(child < 0)
 		return;
@@ -120,8 +119,8 @@ void childHandler()
 		else
 			printf("There is no process [%d] running\n",child);
 	}
-	printf(PROMPT);
-	fflush(stdout);
+//	printf(PROMPT);
+//	fflush(stdout);
 	
 //	backID = 0;
 }
@@ -193,7 +192,6 @@ void parseInputCmd(char **argv)
  */
 void run(char** argv)
 {
-	int output, input;
 	pid_t  pid;
 
 	if((pid = fork()) < 0){
@@ -202,6 +200,7 @@ void run(char** argv)
 			exit(1);
 	}
 	else if(pid == 0){
+		int output, input;
 		// Redirect >
 		if(outputFile != '\0'){
 			output = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
@@ -209,32 +208,35 @@ void run(char** argv)
 			{
 				fprintf(stderr,"ERROR: opening output file\n");
 				fflush(stderr);
-				exit(1);
+				exit(EXIT_FAILURE);
 			}
 			close(STDOUT_FILENO);
-			dup(output);
+			if(dup(output) < 0){
+				fprintf(stderr,"ERROR: dup output file\n");
+				fflush(stderr);
+				exit(EXIT_FAILURE);
+			}
 		}
 		// Redirect <
 		if(inputFile != '\0'){
 			input = open(inputFile, O_RDONLY);
-			if(input < 0)
-			{
-				fprintf(stderr,"ERROR: opening output file\n");
+			if(input < 0){
+				fprintf(stderr,"ERROR: opening input file\n");
 				fflush(stderr);
-				exit(1);
+				exit(EXIT_FAILURE);
 			}			
 			close(STDIN_FILENO);
-			dup(input);
-		}
-		// Background save pid
-		if(background){
-			setpgid(pid,pid);
+			if(dup(input) < 0){
+				fprintf(stderr,"ERROR: dup input file\n");
+				fflush(stderr);
+				exit(EXIT_FAILURE);
+			}
 		}
 		// Execute
 		if(execvp(*argv, argv) < 0){
 			   printf("No such program with name \'%s\' in Unix system!\n",*argv);
 			   fflush(stdout);
-			   exit(1);
+			   exit(EXIT_FAILURE);
 		}
 		// Clearing
 		if(outputFile != '\0')
@@ -249,11 +251,12 @@ void run(char** argv)
 		if(!background){
 			foreID = pid;	// save PID of foreground process
 //			int status;	
+			printf("Started \'%s\': [%d]\n",argv[0],pid);
 			waitpid(pid,NULL,0);
 		}
 		else{
 			backID = pid;	// save PID of background process
-			printf("Started \'%s\': [%d]\n",argv[0],pid);
+			printf("Started BACK \'%s\': [%d]\n",argv[0],pid);
 			fflush(stdout);
 		}
 
@@ -363,16 +366,18 @@ int main(void) {
 	void *resultExec; 
 	
 	struct sigaction sig_child, sig_int;
-	// CHild handler
-	sig_child.sa_handler = childHandler;
-	sig_child.sa_flags = 0;
-	sigemptyset(&sig_child.sa_mask);
-	sigaction(SIGCHLD,&sig_child,NULL);
+
 	// Ctrl+C handler for foreground process
 	sig_int.sa_handler = handler;
 	sig_int.sa_flags = 0;
 	sigemptyset(&sig_int.sa_mask);
 	sigaction(SIGINT,&sig_int,NULL);
+	
+	// CHild handler
+	sig_child.sa_handler = childHandler;
+	sig_child.sa_flags = 0;
+	sigemptyset(&sig_child.sa_mask);
+	sigaction(SIGCHLD,&sig_child,NULL);	
 	
 	// Thread init
 	pthread_attr_init(&attr);
