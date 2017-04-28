@@ -14,8 +14,8 @@ PROJ_NAME = proj02
 FILES = proj02.o 
 PACK = *.c *.h Makefile
 
-default: proj01.o
-	$(CC) $(CFLAGS) proj01.c -o $(PROJ_NAME) $^ -lrt	
+default: proj02.o
+	$(CC) $(CFLAGS) proj02.c -o $(PROJ_NAME) $^ -lrt	
 	
 pack: clean
 	rm -f $(LOGIN).zip
